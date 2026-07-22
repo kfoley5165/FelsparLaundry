@@ -1,1 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Building Laundry Room</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-4 flex justify-center">
 
+  <div class="w-full max-w-md">
+    <!-- Header -->
+    <div class="mb-6 border-b border-gray-800 pb-4">
+      <h1 class="text-2xl font-bold flex items-center gap-2">🧺 Laundry Status</h1>
+      <p class="text-xs text-gray-400">8-Unit Complex • Live Machine Monitor</p>
+    </div>
+
+    <!-- Machine Grid -->
+    <div id="machine-container" class="grid gap-4">
+      <!-- Cards rendered dynamically by JS -->
+    </div>
+  </div>
+
+  <script>
+    // 1. Paste your Free Firebase Config here
+    const firebaseConfig = {
+      databaseURL: "https://laundry-2-fc29c-default-rtdb.firebaseio.com"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const machinesRef = db.ref('machines');
+
+    // 2. Listen for Real-Time Updates (Pushes instantly to browser)
+    machinesRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      const container = document.getElementById('machine-container');
+      container.innerHTML = '';
+
+      for (let id in data) {
+        const m = data[id];
+        const isRunning = m.status === 'in_use';
+        
+        // Calculate remaining time
+        let timeRemainingText = "Ready for use";
+        if (isRunning && m.startTime) {
+          const elapsedMins = Math.floor((Date.now() - m.startTime) / 60000);
+          const leftMins = Math.max(0, m.durationMins - elapsedMins);
+          timeRemainingText = leftMins > 0 ? `${leftMins} mins remaining` : "Cycle complete • Needs unloading";
+        }
+
+        // Status Colors & Badges
+        const badgeColor = isRunning ? "bg-red-500/20 text-red-400 border-red-500/30" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        const badgeText = isRunning ? "🔴 IN USE" : "🟢 AVAILABLE";
+
+        container.innerHTML += `
+          <div class="bg-gray-800 border border-gray-700/60 rounded-xl p-4 flex flex-col justify-between shadow-lg">
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-semibold text-lg text-gray-200">${m.name}</span>
+              <span class="text-xs font-mono px-2.5 py-1 rounded-full border ${badgeColor}">
+                ${badgeText}
+              </span>
+            </div>
+            <div class="text-sm text-gray-400">${timeRemainingText}</div>
+          </div>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>
