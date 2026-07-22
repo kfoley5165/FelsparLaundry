@@ -27,7 +27,7 @@
   <script>
     // 1. Paste your Free Firebase Config here
     const firebaseConfig = {
-      databaseURL: "https://YOUR-PROJECT-NAME-default-rtdb.firebaseio.com"
+      databaseURL: "https://laundry-2-fc29c-default-rtdb.firebaseio.com"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
