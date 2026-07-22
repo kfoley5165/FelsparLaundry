@@ -25,6 +25,9 @@
   </div>
 
   <script>
+    // Store page load time as a fallback anchor so missing Firebase timestamps still tick down
+    const PAGE_LOAD_TIME = Date.now();
+
     // 1. Firebase Config
     const firebaseConfig = {
       databaseURL: "https://laundry-2-fc29c-default-rtdb.firebaseio.com"
@@ -42,31 +45,30 @@
       renderMachines();
     });
 
-// 3. Countdown Math Function (Fixed to prevent NaN)
-function formatCountdown(startTimeMs, durationMinutes = 45) {
-  // Convert startTimeMs to a valid number
-  const parsedTime = Number(startTimeMs);
-  
-  // If parsing fails or yields 0/NaN, default to Date.now() so it starts counting down from 45:00
-  const validStartTime = (!isNaN(parsedTime) && parsedTime > 0) ? parsedTime : Date.now();
+    // 3. Countdown Math Function
+    function formatCountdown(startTimeMs, durationMinutes = 45) {
+      const parsedTime = Number(startTimeMs);
+      
+      // Use Firebase startTime if valid; otherwise fallback to PAGE_LOAD_TIME (NOT Date.now())
+      const validStartTime = (!isNaN(parsedTime) && parsedTime > 0) ? parsedTime : PAGE_LOAD_TIME;
 
-  const totalDurationMs = durationMinutes * 60 * 1000;
-  const elapsedMs = Date.now() - validStartTime;
-  const remainingMs = totalDurationMs - elapsedMs;
+      const totalDurationMs = durationMinutes * 60 * 1000;
+      const elapsedMs = Date.now() - validStartTime;
+      const remainingMs = totalDurationMs - elapsedMs;
 
-  if (remainingMs <= 0) {
-    return { text: "Cycle complete - needs unloading", isDone: true };
-  }
+      if (remainingMs <= 0) {
+        return { text: "Cycle complete - needs unloading", isDone: true };
+      }
 
-  const totalSeconds = Math.floor(remainingMs / 1000);
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
 
-  const formattedMins = String(mins).padStart(2, '0');
-  const formattedSecs = String(secs).padStart(2, '0');
+      const formattedMins = String(mins).padStart(2, '0');
+      const formattedSecs = String(secs).padStart(2, '0');
 
-  return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
-}
+      return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
+    }
 
     // 4. Render UI
     function renderMachines() {
@@ -75,7 +77,6 @@ function formatCountdown(startTimeMs, durationMinutes = 45) {
       const container = document.getElementById('machine-container');
       let html = '';
 
-      // Set display order
       const machineKeys = ['1washer1', '1washer2', '2dryer1', '2dryer2'];
 
       machineKeys.forEach((key) => {
@@ -90,7 +91,6 @@ function formatCountdown(startTimeMs, durationMinutes = 45) {
         let isDone = false;
 
         if (isRunning) {
-          // Force duration to 45 minutes for all machines
           const countdown = formatCountdown(m.startTime, 45);
           timeRemainingText = countdown.text;
           isDone = countdown.isDone;
@@ -122,9 +122,8 @@ function formatCountdown(startTimeMs, durationMinutes = 45) {
       container.innerHTML = html;
     }
 
-    // 5. Re-render every second to tick down the MM:SS timer cleanly
+    // 5. Re-render every second
     setInterval(renderMachines, 1000);
   </script>
 </body>
 </html>
-
