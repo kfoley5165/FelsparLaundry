@@ -42,27 +42,31 @@
       renderMachines();
     });
 
-    // 3. Countdown Math Function (Fixed at 45 minutes)
-    function formatCountdown(startTimeMs, durationMinutes = 45) {
-      if (!startTimeMs) return { text: "Ready to use", isDone: false };
+// 3. Countdown Math Function (Fixed to prevent NaN)
+function formatCountdown(startTimeMs, durationMinutes = 45) {
+  // Convert startTimeMs to a valid number
+  const parsedTime = Number(startTimeMs);
+  
+  // If parsing fails or yields 0/NaN, default to Date.now() so it starts counting down from 45:00
+  const validStartTime = (!isNaN(parsedTime) && parsedTime > 0) ? parsedTime : Date.now();
 
-      const totalDurationMs = durationMinutes * 60 * 1000;
-      const elapsedMs = Date.now() - Number(startTimeMs);
-      const remainingMs = totalDurationMs - elapsedMs;
+  const totalDurationMs = durationMinutes * 60 * 1000;
+  const elapsedMs = Date.now() - validStartTime;
+  const remainingMs = totalDurationMs - elapsedMs;
 
-      if (remainingMs <= 0) {
-        return { text: "Cycle complete - needs unloading", isDone: true };
-      }
+  if (remainingMs <= 0) {
+    return { text: "Cycle complete - needs unloading", isDone: true };
+  }
 
-      const totalSeconds = Math.floor(remainingMs / 1000);
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
 
-      const formattedMins = String(mins).padStart(2, '0');
-      const formattedSecs = String(secs).padStart(2, '0');
+  const formattedMins = String(mins).padStart(2, '0');
+  const formattedSecs = String(secs).padStart(2, '0');
 
-      return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
-    }
+  return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
+}
 
     // 4. Render UI
     function renderMachines() {
