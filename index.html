@@ -25,89 +25,80 @@
   </div>
 
   <script>
-    // 1. Paste your Free Firebase Config here
+    // 1. Firebase Config
     const firebaseConfig = {
       databaseURL: "https://laundry-2-fc29c-default-rtdb.firebaseio.com"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-
     const machinesRef = db.ref('machines');
 
-    // 2. Listen for Real-Time Updates (Pushes instantly to browser)
+    // Store data locally so we can update the timer without hitting Firebase every second
+    let currentData = null;
+
+    // 2. Listen for Firebase Updates
     machinesRef.on('value', (snapshot) => {
-      const data = snapshot.val();
-      const container = document.getElementById('machine-container');
-      container.innerHTML = '';
-
-      for (let id in data) {
-        const m = data[id];
-        const isRunning = m.status === 'in_use';
-        
-        // Calculate remaining time
-     // Function to format milliseconds into MM:SS
-function formatCountdown(startTimeMs, durationMinutes) {
-  if (!startTimeMs) return { text: "In Use", isDone: false };
-
-  const totalDurationMs = durationMinutes * 60 * 1000;
-  const elapsedMs = Date.now() - Number(startTimeMs);
-  const remainingMs = totalDurationMs - elapsedMs;
-
-  // If time has genuinely expired
-  if (remainingMs <= 0) {
-    return { text: "Cycle complete - needs unloading", isDone: true };
-  }
-
-  // Calculate minutes and seconds remaining
-  const totalSeconds = Math.floor(remainingMs / 1000);
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-
-  // Pad with leading zeros (e.g. 05:09)
-  const formattedMins = String(mins).padStart(2, '0');
-  const formattedSecs = String(secs).padStart(2, '0');
-
-  return { text: `${formattedMins}:${formattedSecs} remaining`, isDone: false };
-}
-
-// Ensure the UI updates every 1 second so the timer ticks live on screen
-setInterval(() => {
-  dbRef.once('value', (snapshot) => {
-    const data = snapshot.val();
-    if (!data) return;
-
-    const machineKeys = ['1washer1', '1washer2', '2dryer1', '2dryer2'];
-    let html = '';
-
-    machineKeys.forEach((key) => {
-      const machine = data[key];
-      if (!machine) return;
-
-      let statusDisplay = "🟢 Available";
-      let statusClass = "available";
-
-      if (machine.status === 'in_use') {
-        const countdown = formatCountdown(machine.startTime, machine.durationMin || 45);
-        statusDisplay = countdown.isDone ? "🔴 " + countdown.text : "⏳ " + countdown.text;
-        statusClass = countdown.isDone ? "needs-unloading" : "in-use";
-      }
-
-      html += `
-        <div class="machine-card ${statusClass}">
-          <h2>${machine.name}</h2>
-          <p class="status">${statusDisplay}</p>
-        </div>
-      `;
+      currentData = snapshot.val();
+      renderMachines(); // Update UI immediately when data changes
     });
 
-    document.getElementById('machines-container').innerHTML = html;
-  });
-}, 1000);
-        // Status Colors & Badges
-        const badgeColor = isRunning ? "bg-red-500/20 text-red-400 border-red-500/30" : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-        const badgeText = isRunning ? "🔴 IN USE" : "🟢 AVAILABLE";
+    // 3. Countdown Math Function
+    function formatCountdown(startTimeMs, durationMinutes) {
+      if (!startTimeMs) return { text: "Ready to use", isDone: false };
 
-        container.innerHTML += `
+      const totalDurationMs = durationMinutes * 60 * 1000;
+      const elapsedMs = Date.now() - Number(startTimeMs);
+      const remainingMs = totalDurationMs - elapsedMs;
+
+      if (remainingMs <= 0) {
+        return { text: "Cycle complete - needs unloading", isDone: true };
+      }
+
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+
+      const formattedMins = String(mins).padStart(2, '0');
+      const formattedSecs = String(secs).padStart(2, '0');
+
+      return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
+    }
+
+    // 4. Render the UI
+    function renderMachines() {
+      if (!currentData) return;
+
+      const container = document.getElementById('machine-container');
+      let html = '';
+
+      // Force the exact display order on the screen
+      const machineKeys = ['1washer1', '1washer2', '2dryer1', '2dryer2'];
+
+      machineKeys.forEach((key) => {
+        const m = currentData[key];
+        if (!m) return;
+
+        const isRunning = m.status === 'in_use';
+        
+        let timeRemainingText = "Available";
+        let badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        let badgeText = "🟢 AVAILABLE";
+
+        if (isRunning) {
+           const countdown = formatCountdown(m.startTime, m.durationMin || 45);
+           timeRemainingText = countdown.text;
+           
+           if (countdown.isDone) {
+             badgeColor = "bg-red-500/20 text-red-400 border-red-500/30";
+             badgeText = "🔴 NEEDS UNLOADING";
+           } else {
+             // Yellow/Orange for currently running
+             badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+             badgeText = "⏱️ IN USE";
+           }
+        }
+
+        html += `
           <div class="bg-gray-800 border border-gray-700/60 rounded-xl p-4 flex flex-col justify-between shadow-lg">
             <div class="flex justify-between items-start mb-2">
               <span class="font-semibold text-lg text-gray-200">${m.name}</span>
@@ -115,11 +106,16 @@ setInterval(() => {
                 ${badgeText}
               </span>
             </div>
-            <div class="text-sm text-gray-400">${timeRemainingText}</div>
+            <div class="text-sm ${countdown?.isDone ? 'text-red-400 font-semibold' : 'text-gray-400'}">${timeRemainingText}</div>
           </div>
         `;
-      }
-    });
+      });
+
+      container.innerHTML = html;
+    }
+
+    // 5. Tick the clock every 1 second
+    setInterval(renderMachines, 1000);
   </script>
 </body>
 </html>
