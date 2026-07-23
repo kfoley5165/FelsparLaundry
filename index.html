@@ -46,29 +46,31 @@
     });
 
     // 3. Countdown Math Function
-    function formatCountdown(startTimeMs, durationMinutes = 45) {
-      const parsedTime = Number(startTimeMs);
-      
-      // Use Firebase startTime if valid; otherwise fallback to PAGE_LOAD_TIME (NOT Date.now())
-      const validStartTime = (!isNaN(parsedTime) && parsedTime > 0) ? parsedTime : PAGE_LOAD_TIME;
+function formatCountdown(startTimeMs, durationMinutes = 45) {
+  const parsedTime = Number(startTimeMs);
+  
+  // STRICT: If startTime is missing, null, or 0 in Firebase, do NOT create a fake timer!
+  if (!parsedTime || isNaN(parsedTime) || parsedTime <= 0) {
+    return { text: "⚠️ Tap NFC tag to start timer", isDone: false };
+  }
 
-      const totalDurationMs = durationMinutes * 60 * 1000;
-      const elapsedMs = Date.now() - validStartTime;
-      const remainingMs = totalDurationMs - elapsedMs;
+  const totalDurationMs = durationMinutes * 60 * 1000;
+  const elapsedMs = Date.now() - parsedTime;
+  const remainingMs = totalDurationMs - elapsedMs;
 
-      if (remainingMs <= 0) {
-        return { text: "Cycle complete - needs unloading", isDone: true };
-      }
+  if (remainingMs <= 0) {
+    return { text: "Cycle complete - needs unloading", isDone: true };
+  }
 
-      const totalSeconds = Math.floor(remainingMs / 1000);
-      const mins = Math.floor(totalSeconds / 60);
-      const secs = totalSeconds % 60;
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
 
-      const formattedMins = String(mins).padStart(2, '0');
-      const formattedSecs = String(secs).padStart(2, '0');
+  const formattedMins = String(mins).padStart(2, '0');
+  const formattedSecs = String(secs).padStart(2, '0');
 
-      return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
-    }
+  return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
+}
 
     // 4. Render UI
     function renderMachines() {
