@@ -85,7 +85,7 @@ machineKeys.forEach((key) => {
   const m = currentData[key];
   if (!m) return;
 
-  // A machine is ONLY running if status is 'in_use' AND startTime actually exists
+  // 1. Determine if running (must have status 'in_use' AND a valid startTime)
   const isRunning = m.status === 'in_use' && m.startTime;
   
   let timeRemainingText = "Ready to use";
@@ -99,12 +99,12 @@ machineKeys.forEach((key) => {
     const isDone = countdown.isDone || elapsedMinutes >= 45;
 
     if (isDone) {
-      // 1. Keep green styling
+      // Keep green AVAILABLE state
       badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
       badgeText = "🟢 AVAILABLE";
       timeRemainingText = "Ready to use";
 
-      // 2. Clean up Firebase status back to 'available'
+      // Reset Firebase in background
       try {
         const ref = (typeof database !== "undefined" && database.ref) ? database.ref : (typeof db !== "undefined" && db.ref) ? db.ref : null;
         if (ref) {
@@ -116,12 +116,26 @@ machineKeys.forEach((key) => {
         console.warn("Reset error:", err);
       }
     } else {
-      // Still running active cycle -> Yellow
+      // Active running cycle
       badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
       badgeText = "⏱️ IN USE";
       timeRemainingText = countdown.text;
     }
   }
+
+  // 2. Update the HTML elements on the screen
+  const badgeEl = document.getElementById(`${key}-badge`);
+  const timerEl = document.getElementById(`${key}-timer`);
+
+  if (badgeEl) {
+    badgeEl.className = `px-3 py-1 rounded-full text-xs font-semibold border ${badgeColor}`;
+    badgeEl.innerText = badgeText;
+  }
+  
+  if (timerEl) {
+    timerEl.innerText = timeRemainingText;
+  }
+});
 
         const textColorClass = isDone ? 'text-red-400 font-semibold' : (isRunning ? 'text-yellow-400 font-mono font-medium' : 'text-emerald-400');
 
