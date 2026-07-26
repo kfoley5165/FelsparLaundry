@@ -42,6 +42,9 @@
       renderMachines();
     });
 
+    // Track machines we've already reset to prevent endless loop updates
+    const resetMachines = new Set();
+
     // 3. Countdown Math Function
     function formatCountdown(startTimeMs, durationMinutes = 45) {
       const parsedTime = Number(startTimeMs);
@@ -96,19 +99,23 @@
           const isDone = countdown.isDone || elapsedMinutes >= 45;
 
           if (isDone) {
-            // Keep status as green AVAILABLE
+            // Keep status display green AVAILABLE
             badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
             badgeText = "🟢 AVAILABLE";
             timeRemainingText = "Ready to use";
             textColorClass = "text-emerald-400";
 
-            // Clean reset in Firebase database
-            db.ref(`machines/${key}`).update({
-              status: "available",
-              startTime: null
-            }).catch(err => console.warn("Auto-reset note:", err));
+            // Reset Firebase ONLY ONCE when timer hits zero
+            if (!resetMachines.has(key)) {
+              resetMachines.add(key);
+              db.ref(`machines/${key}`).update({
+                status: "available",
+                startTime: null
+              }).catch(err => console.warn("Reset note:", err));
+            }
           } else {
-            // Active running cycle -> Yellow badge + countdown text
+            // Active running cycle -> Yellow badge + countdown timer
+            resetMachines.delete(key); // clear reset flag if running
             badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
             badgeText = "⏱️ IN USE";
             timeRemainingText = countdown.text;
@@ -116,11 +123,11 @@
           }
         }
 
-        // Build HTML string for card
+        // Build HTML string
         html += `
           <div class="bg-gray-800 border border-gray-700/60 rounded-xl p-4 flex flex-col justify-between shadow-lg">
             <div class="flex justify-between items-start mb-2">
-              <span class="font-semibold text-lg text-gray-200">${m.name}</span>
+              <span class="font-semibold text-lg text-gray-200">${m.name || key}</span>
               <span class="text-xs font-mono px-2.5 py-1 rounded-full border ${badgeColor}">
                 ${badgeText}
               </span>
@@ -133,8 +140,9 @@
       container.innerHTML = html;
     }
 
-    // 5. Re-render every second to update active countdown clocks
+    // 5. Re-render every second to tick down active clocks
     setInterval(renderMachines, 1000);
   </script>
 </body>
 </html>
+
