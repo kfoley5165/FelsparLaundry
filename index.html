@@ -25,9 +25,6 @@
   </div>
 
   <script>
-    // Store page load time as a fallback anchor so missing Firebase timestamps still tick down
-    const PAGE_LOAD_TIME = Date.now();
-
     // 1. Firebase Config
     const firebaseConfig = {
       databaseURL: "https://laundry-2-fc29c-default-rtdb.firebaseio.com"
@@ -46,31 +43,30 @@
     });
 
     // 3. Countdown Math Function
-function formatCountdown(startTimeMs, durationMinutes = 45) {
-  const parsedTime = Number(startTimeMs);
-  
-  // STRICT: If startTime is missing, null, or 0 in Firebase, do NOT create a fake timer!
-  if (!parsedTime || isNaN(parsedTime) || parsedTime <= 0) {
-    return { text: "⚠️ Tap NFC tag to start timer", isDone: false };
-  }
+    function formatCountdown(startTimeMs, durationMinutes = 45) {
+      const parsedTime = Number(startTimeMs);
+      
+      if (!parsedTime || isNaN(parsedTime) || parsedTime <= 0) {
+        return { text: "Ready to use", isDone: false };
+      }
 
-  const totalDurationMs = durationMinutes * 60 * 1000;
-  const elapsedMs = Date.now() - parsedTime;
-  const remainingMs = totalDurationMs - elapsedMs;
+      const totalDurationMs = durationMinutes * 60 * 1000;
+      const elapsedMs = Date.now() - parsedTime;
+      const remainingMs = totalDurationMs - elapsedMs;
 
-  if (remainingMs <= 0) {
-    return { text: "Cycle complete - needs unloading", isDone: true };
-  }
+      if (remainingMs <= 0) {
+        return { text: "Ready to use", isDone: true };
+      }
 
-  const totalSeconds = Math.floor(remainingMs / 1000);
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
 
-  const formattedMins = String(mins).padStart(2, '0');
-  const formattedSecs = String(secs).padStart(2, '0');
+      const formattedMins = String(mins).padStart(2, '0');
+      const formattedSecs = String(secs).padStart(2, '0');
 
-  return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
-}
+      return { text: `⏳ ${formattedMins}:${formattedSecs} remaining`, isDone: false };
+    }
 
     // 4. Render UI
     function renderMachines() {
@@ -81,64 +77,46 @@ function formatCountdown(startTimeMs, durationMinutes = 45) {
 
       const machineKeys = ['1washer1', '1washer2', '2dryer1', '2dryer2'];
 
-machineKeys.forEach((key) => {
-  const m = currentData[key];
-  if (!m) return;
+      machineKeys.forEach((key) => {
+        const m = currentData[key];
+        if (!m) return;
 
-  // 1. Determine if running (must have status 'in_use' AND a valid startTime)
-  const isRunning = m.status === 'in_use' && m.startTime;
-  
-  let timeRemainingText = "Ready to use";
-  let badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-  let badgeText = "🟢 AVAILABLE";
+        // A machine is ONLY running if status is 'in_use' AND startTime exists
+        const isRunning = m.status === 'in_use' && m.startTime;
+        
+        let timeRemainingText = "Ready to use";
+        let badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        let badgeText = "🟢 AVAILABLE";
+        let textColorClass = "text-emerald-400";
 
-  if (isRunning) {
-    const startTimeNum = Number(m.startTime);
-    const elapsedMinutes = (Date.now() - startTimeNum) / (1000 * 60);
-    const countdown = formatCountdown(m.startTime, 45);
-    const isDone = countdown.isDone || elapsedMinutes >= 45;
+        if (isRunning) {
+          const startTimeNum = Number(m.startTime);
+          const elapsedMinutes = (Date.now() - startTimeNum) / (1000 * 60);
+          const countdown = formatCountdown(m.startTime, 45);
+          const isDone = countdown.isDone || elapsedMinutes >= 45;
 
-    if (isDone) {
-      // Keep green AVAILABLE state
-      badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-      badgeText = "🟢 AVAILABLE";
-      timeRemainingText = "Ready to use";
+          if (isDone) {
+            // Keep status as green AVAILABLE
+            badgeColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+            badgeText = "🟢 AVAILABLE";
+            timeRemainingText = "Ready to use";
+            textColorClass = "text-emerald-400";
 
-      // Reset Firebase in background
-      try {
-        const ref = (typeof database !== "undefined" && database.ref) ? database.ref : (typeof db !== "undefined" && db.ref) ? db.ref : null;
-        if (ref) {
-          ref.call(typeof database !== "undefined" ? database : db, `machines/${key}`).update({
-            status: "available"
-          });
+            // Clean reset in Firebase database
+            db.ref(`machines/${key}`).update({
+              status: "available",
+              startTime: null
+            }).catch(err => console.warn("Auto-reset note:", err));
+          } else {
+            // Active running cycle -> Yellow badge + countdown text
+            badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+            badgeText = "⏱️ IN USE";
+            timeRemainingText = countdown.text;
+            textColorClass = "text-yellow-400 font-mono font-medium";
+          }
         }
-      } catch (err) {
-        console.warn("Reset error:", err);
-      }
-    } else {
-      // Active running cycle
-      badgeColor = "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-      badgeText = "⏱️ IN USE";
-      timeRemainingText = countdown.text;
-    }
-  }
 
-  // 2. Update the HTML elements on the screen
-  const badgeEl = document.getElementById(`${key}-badge`);
-  const timerEl = document.getElementById(`${key}-timer`);
-
-  if (badgeEl) {
-    badgeEl.className = `px-3 py-1 rounded-full text-xs font-semibold border ${badgeColor}`;
-    badgeEl.innerText = badgeText;
-  }
-  
-  if (timerEl) {
-    timerEl.innerText = timeRemainingText;
-  }
-});
-
-        const textColorClass = isDone ? 'text-red-400 font-semibold' : (isRunning ? 'text-yellow-400 font-mono font-medium' : 'text-emerald-400');
-
+        // Build HTML string for card
         html += `
           <div class="bg-gray-800 border border-gray-700/60 rounded-xl p-4 flex flex-col justify-between shadow-lg">
             <div class="flex justify-between items-start mb-2">
@@ -155,7 +133,7 @@ machineKeys.forEach((key) => {
       container.innerHTML = html;
     }
 
-    // 5. Re-render every second
+    // 5. Re-render every second to update active countdown clocks
     setInterval(renderMachines, 1000);
   </script>
 </body>
